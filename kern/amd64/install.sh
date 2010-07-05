@@ -1,6 +1,6 @@
 #!/bin/bash
 
-xz < hd.img.xz > hd.img
+unxz < hd.img.xz > hd.img
 
 LOOP=`losetup -o 32256 -v -f hd.img`
 if [ $? -ne 0 ]; then
@@ -14,6 +14,8 @@ echo Loop device is $LOOP
 mkdir -p mntpt
 mount $LOOP mntpt
 
+cp menu.lst mntpt/
+cp bootstrap.elf mntpt/
 cp kernel.elf mntpt/
 
 umount mntpt

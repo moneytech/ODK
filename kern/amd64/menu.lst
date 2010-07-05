@@ -1,0 +1,3 @@
+title ODK
+kernel (hd0,0)/bootstrap.elf
+module (hd0,0)/kernel.elf

@@ -1,15 +1,11 @@
 OUTPUT_FORMAT(elf64-x86-64)
-ENTRY(_start)
+ENTRY(_start64)
 
 SECTIONS
 {
   VMA = 0xffffffffc0000000;
 
-  . = 0x100000;
-  .bootstrap :
-  {
-    *(.bootstrap)
-  }
+  . = VMA + 0x200000;
 
 	.text : AT(ADDR(.text) - VMA)
 	{
@@ -32,10 +28,8 @@ SECTIONS
 	.bss : AT(ADDR(.bss) - VMA)
 	{
 		_sbss = .;
-    _sbss_phys = _sbss - VMA;
 		*(.bss)
 		*(COMMON)
 		_ebss = .;
-    _ebss_phys = _ebss - VMA;
 	}
 }
