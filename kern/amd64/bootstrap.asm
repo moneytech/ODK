@@ -143,6 +143,9 @@ _start:
   or eax, 0x80000000 ; paging enable
   mov cr0, eax
 
+  ; set up args to kernel
+  mov eax, [mboot_info]
+
   ; jump into kernel
   push dword 2
   push dword 0x18
