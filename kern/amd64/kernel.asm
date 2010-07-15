@@ -15,8 +15,7 @@ GDT:
 
 GDTR:
   dw (GDTR-GDT) - 1
-  dd GDT
-  dd 0
+  dq GDT
 
 ; IDT
 IDTR: dw 4095
@@ -47,7 +46,8 @@ global _start64
 _start64:
 
   ; load our GDT (become independent of bootstrap)
-  lgdt [GDTR]
+  mov rdi, GDTR
+  lgdt [rdi]
 
   ; set up 64-bit IRET frame to switch segments and jump to upper half
   push qword 0x10 ; SS = 0x10
@@ -61,8 +61,9 @@ _start64:
 .upperhalf:
 
   ; save kernel arg: multiboot info
-  add rax, VMA
-  mov [mboot_info], rax
+  mov rbx, VMA
+  add rax, rbx
+  mov [qword mboot_info], rax
 
   ; zero the bss
 extern _sbss, _ebss
@@ -77,6 +78,9 @@ extern _sbss, _ebss
   ; enable interrupts
   sti
 
+  ; call kmain
+  call kmain
+
 ;; Initialization Routines
 
 global init_idt
@@ -89,10 +93,10 @@ init_idt:
   ; fill IDT entry
   cmp ecx, 31
   jg .intvec
-  mov rax, [IDT_exc]
+  mov rax, [qword IDT_exc]
   jmp .intvec2
 .intvec:
-  mov rax, [IDT_int]
+  mov rax, [qword IDT_int]
 .intvec2:
 
   mov rbx, r10
@@ -119,7 +123,8 @@ init_idt:
   mov byte [r10], IDT_jmprel
   add r10, 5
   mov rbx, r10
-  sub rbx, vec_common
+  mov rdx, vec_common
+  sub rbx, rdx
   mov [r10-4], ebx
 
   inc ecx
@@ -133,7 +138,6 @@ init_syscall:
   mov ecx, 0xc0000082
   mov edx, 0xffffffff
   mov rax, _syscall
-  and rax, 0xffffffff
   wrmsr
 
   ; enable syscall
@@ -145,6 +149,7 @@ init_syscall:
   ret
 
 _syscall:
+  sysret
 
 ;; Vectors
 
@@ -167,7 +172,6 @@ vec_common:
   push rax
 
   mov rdi, rsp
-extern vec
   mov rax, 15
   not rax
   and rsp, rax
@@ -226,6 +230,16 @@ new_ctx: ; rdi = new stack top, rsi = user stack, rdx = user rip, rcx = user par
   xchg rdi, rsp
   ret
 
+;; Main Kernel Core
+global kmain
+kmain:
+  jmp $
+
+global vec
+vec:
+  mov rax, rdi
+  ret
+
 ;; Utility Functions
 
 global bzero
@@ -245,17 +259,18 @@ bzero: ; rdi = dest, rsi = size (bytes)
   jmp .preloop
 .preloop_exit:
 
+  xor eax, eax
 .loop:
   cmp rsi, 64
   jl .loop_exit
-  mov qword [rdi], 0
-  mov qword [rdi+8], 0
-  mov qword [rdi+16], 0
-  mov qword [rdi+24], 0
-  mov qword [rdi+32], 0
-  mov qword [rdi+40], 0
-  mov qword [rdi+48], 0
-  mov qword [rdi+56], 0
+  mov [rdi], rax
+  mov [rdi+8], rax
+  mov [rdi+16], rax
+  mov [rdi+24], rax
+  mov [rdi+32], rax
+  mov [rdi+40], rax
+  mov [rdi+48], rax
+  mov [rdi+56], rax
   add rdi, 64
   sub rsi, 64
   jmp .loop
