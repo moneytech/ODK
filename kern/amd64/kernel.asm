@@ -1,4 +1,5 @@
 bits 64
+default rel
 
 ;; DATA STRUCTURES
 section .data
@@ -21,13 +22,6 @@ GDTR:
 IDTR: dw 4095
 dq IDT
 
-IDT_exc: ; templates
-  dw 0, 0x8, 0x8e00, 0
-  dw 0, 0, 0, 0
-IDT_int:
-  dw 0, 0x8, 0x8f00, 0
-  dw 0, 0, 0, 0
-
 IDT_errcode_mask equ (1 << 8) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17)
 IDT_pushq equ 0x68
 IDT_jmprel equ 0xe9
@@ -44,36 +38,38 @@ extern VMA
 
 global _start64
 _start64:
+  cli
 
   ; load our GDT (become independent of bootstrap)
-  mov rdi, GDTR
-  lgdt [rdi]
+  lgdt [GDTR]
 
   ; set up 64-bit IRET frame to switch segments and jump to upper half
-  push qword 0x10 ; SS = 0x10
-  push qword 0xffffffffc0900000 ; ESP = phys_to_virt(0x900000)
-  push qword 2 ; EFLAGS = 2
-  push qword 0x8 ; CS = 0x8
-  mov rbx, .upperhalf ; get around weird relocation limits
-  push rbx ; RIP = .upperhalf
-  iret
+  push 0x10 ; SS = 0x10
+  mov rbx, 0xffffffffc0900000 ; ESP = phys_to_virt(0x900000)
+  push rbx
+  push 2 ; EFLAGS = 2
+  push 0x8 ; CS = 0x8
+  mov rbx, qword .upperhalf ; RIP = .upperhalf
+  push rbx 
+  iretq
 
 .upperhalf:
 
   ; save kernel arg: multiboot info
-  mov rbx, VMA
+  mov rbx, qword VMA
   add rax, rbx
-  mov [qword mboot_info], rax
+  mov [mboot_info], rax
 
   ; zero the bss
 extern _sbss, _ebss
-  mov rsi, _ebss 
-  mov rdi, _sbss ; rdi = dest
+  mov rsi, qword _ebss 
+  mov rdi, qword _sbss ; rdi = dest
   sub rsi, rdi   ; rsi = size
   call bzero
 
   ; init the IDT
   call init_idt
+  lidt [IDTR]
 
   ; enable interrupts
   sti
@@ -83,31 +79,76 @@ extern _sbss, _ebss
 
 ;; Initialization Routines
 
+hex: db '0123456789abcdef'
+hexbuf: dd 0, 0
+hexptr: dq VMA + 0xb8000
+
+writehex:
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  mov rcx, 8
+  lea rdx, [hex]
+  lea rbx, [hexbuf]
+.l:
+  mov rax, rdi
+  and rax, 15
+  shr rdi, 4
+  mov al, [rdx + rax]
+  mov [rbx], al
+  inc rbx
+  loop .l
+
+  mov ecx, 8
+  mov rdi, [hexptr]
+  lea rbx, [hexbuf+8]
+.l2:
+  dec rbx
+  mov al, [rbx]
+  mov [rdi], al
+  add rdi, 2
+  loop .l2
+
+  mov byte [rdi], ' '
+  mov byte [rdi+2], ' '
+  add rdi, 4
+  mov [hexptr], rdi
+
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  ret
+
 global init_idt
 init_idt:
   mov r9, IDT_errcode_mask
   mov ecx, 0
-  mov r10, IDT_stubs
-  mov r11, IDT
+  lea r10, [IDT_stubs]
+  lea r11, [IDT]
 .l:
   ; fill IDT entry
   cmp ecx, 31
   jg .intvec
-  mov rax, [qword IDT_exc]
+  mov al, 0x8e
   jmp .intvec2
 .intvec:
-  mov rax, [qword IDT_int]
+  mov al, 0x8f
 .intvec2:
-
+  mov byte [r11+5], al ; type/DLP/present
+  mov byte [r11+4], 0  ; rsvd, IST
+  mov word [r11+2], 8 ; CS
   mov rbx, r10
-  and rbx, 0xffff
-  or rax, rbx
-  mov [r11], rax
+  mov word [r11], bx ; offset 0-15
   shr rbx, 16
-  mov [r11+8], rbx
+  mov word [r11+6], bx ; offset 16-31
+  shr rbx, 16
+  mov dword [r11+8], ebx ; offset 32-63
+  mov dword [r11+12], 0 ; rsvd
   add r11, 16
 
-  ; generate stub: push qword 0 if no errcode, push qword vector, jmprel to vec_common
+   ; generate stub: push qword 0 if no errcode, push qword vector, jmprel to vec_common
   cmp ecx, 31
   jg .noerrcode
   bt r9, rcx
@@ -123,7 +164,7 @@ init_idt:
   mov byte [r10], IDT_jmprel
   add r10, 5
   mov rbx, r10
-  mov rdx, vec_common
+  mov rdx, qword vec_common
   sub rbx, rdx
   mov [r10-4], ebx
 
@@ -137,7 +178,7 @@ init_syscall:
   ; set LSTAR to syscall entry point
   mov ecx, 0xc0000082
   mov edx, 0xffffffff
-  mov rax, _syscall
+  mov rax, qword _syscall
   wrmsr
 
   ; enable syscall
@@ -205,13 +246,13 @@ set_cr3:
 global new_ctx ; void new_ctx(u64 kstack, u64 ustack, u64 uip, u64 param)
 new_ctx: ; rdi = new stack top, rsi = user stack, rdx = user rip, rcx = user param
   xchg rdi, rsp
-  push qword 0x20
+  push 0x20
   push rsi
   pushf
-  push qword 0x18
+  push 0x18
   push rdx
-  push qword 0
-  push qword 0
+  push 0
+  push 0
   push r15
   push r14
   push r13
@@ -237,8 +278,20 @@ kmain:
 
 global vec
 vec:
+  mov rcx, [rdi+128]
+  mov rbx, rcx
+  shr rbx, 4
+  and rbx, 15
+  and rcx, 15
+  lea rdx, [hex]
+  mov bl, [rdx + rbx]
+  mov cl, [rdx + rcx]
+  lea rdx, [VMA + 0xb8000]
+  mov [rdx], bl
+  mov [rdx+2], cl
   mov rax, rdi
   ret
+
 
 ;; Utility Functions
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 
-unxz < hd.img.xz > hd.img
+if test ! -f hd.img; then
+  unxz < hd.img.xz > hd.img
+  chmod 0777 hd.img
+fi
 
 LOOP=`losetup -o 32256 -v -f hd.img`
 if [ $? -ne 0 ]; then

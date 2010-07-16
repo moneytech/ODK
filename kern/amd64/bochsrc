@@ -10,7 +10,7 @@ floppy_bootsig_check: disabled=0
 # no floppya
 # no floppyb
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
-ata0-master: type=disk, mode=flat, translation=auto, path="hd.img", cylinders=0, heads=0, spt=0, biosdetect=auto, model="Generic 1234"
+ata0-master: type=disk, mode=flat, translation=auto, path="hd.img", cylinders=0, heads=16, spt=63, biosdetect=auto, model="Generic 1234"
 ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=15
 ata2: enabled=0
 ata3: enabled=0
@@ -27,8 +27,8 @@ vga_update_interval: 50000
 vga: extension=vbe
 cpu: count=1, ips=4000000, reset_on_triple_fault=1, cpuid_limit_winnt=0
 print_timestamps: enabled=0
-# no gdb stub
-port_e9_hack: enabled=0
+#gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0
+port_e9_hack: enabled=1
 text_snapshot_check: enabled=0
 private_colormap: enabled=0
 clock: sync=none, time0=local
