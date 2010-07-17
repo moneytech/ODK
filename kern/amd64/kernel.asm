@@ -139,7 +139,8 @@ init_idt:
   mov byte [r11+5], al ; type/DLP/present
   mov byte [r11+4], 0  ; rsvd, IST
   mov word [r11+2], 8 ; CS
-  mov rbx, r10
+  ;mov rbx, r10
+  mov rbx, qword vec_common
   mov word [r11], bx ; offset 0-15
   shr rbx, 16
   mov word [r11+6], bx ; offset 16-31
@@ -165,8 +166,8 @@ init_idt:
   add r10, 5
   mov rbx, r10
   mov rdx, qword vec_common
-  sub rbx, rdx
-  mov [r10-4], ebx
+  sub rdx, rbx
+  mov [r10-4], edx
 
   inc ecx
   cmp ecx, 255
@@ -278,18 +279,10 @@ kmain:
 
 global vec
 vec:
-  mov rcx, [rdi+128]
-  mov rbx, rcx
-  shr rbx, 4
-  and rbx, 15
-  and rcx, 15
-  lea rdx, [hex]
-  mov bl, [rdx + rbx]
-  mov cl, [rdx + rcx]
-  lea rdx, [VMA + 0xb8000]
-  mov [rdx], bl
-  mov [rdx+2], cl
-  mov rax, rdi
+  mov rdi, [rdi+128]
+  call writehex
+  cli
+  jmp $
   ret
 
 
