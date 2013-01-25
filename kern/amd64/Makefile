@@ -15,4 +15,8 @@ kernel.o: kernel.asm
 
 .PHONY: clean
 clean:
-	rm -f *.o *~ bootstrap.elf kernel.elf hd.img
+	rm -f *.o *~ bootstrap.elf kernel.elf bootimg/hd.img
+
+.PHONY: install
+install:
+	(cd bootimg; sudo ./install.sh)

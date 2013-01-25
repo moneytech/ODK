@@ -53,7 +53,7 @@ _start:
   mov [kern_image], edx
 
   ; now, load the elf image at edx
-  cmp dword [edx], `\x7FELF` ; verify magic
+  cmp dword [edx], 0x464C457F ; verify magic: \x7FELF
   jne load_error
   cmp byte [edx+4], 2 ; verify class (ELF64)
   jne load_error

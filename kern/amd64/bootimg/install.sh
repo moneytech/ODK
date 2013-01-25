@@ -12,16 +12,25 @@ if [ $? -ne 0 ]; then
 fi
 
 LOOP=`echo $LOOP | awk '{print $4}'`
+
+if [ $LOOP = "already" ]; then
+    echo Image already mounted.
+    exit 1
+fi
+
 echo Loop device is $LOOP
 
 mkdir -p mntpt
 mount $LOOP mntpt
 
 cp menu.lst mntpt/
-cp bootstrap.elf mntpt/
-cp kernel.elf mntpt/
+cp ../bootstrap.elf mntpt/
+cp ../kernel.elf mntpt/
 
 umount mntpt
-losetup -d $LOOP
+sleep 1
+umount mntpt
+losetup -d $LOOP || exit 1
 
+if [ -f mntpt/menu.lst ]; then exit 1; fi
 rm -r mntpt
