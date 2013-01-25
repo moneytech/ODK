@@ -62,10 +62,11 @@ _start64:
 
   ; zero the bss
 extern _sbss, _ebss
-  mov rsi, qword _ebss 
+  mov rcx, qword _ebss 
   mov rdi, qword _sbss ; rdi = dest
-  sub rsi, rdi   ; rsi = size
-  call bzero
+  sub rcx, rdi         ; rcx = size
+  xor eax, eax
+  rep stosb
 
   ; init the IDT
   call init_idt
@@ -79,49 +80,6 @@ extern _sbss, _ebss
 
 ;; Initialization Routines
 
-hex: db '0123456789abcdef'
-hexbuf: dd 0, 0
-hexptr: dq VMA + 0xb8000
-
-writehex:
-  push rax
-  push rbx
-  push rcx
-  push rdx
-  mov rcx, 8
-  lea rdx, [hex]
-  lea rbx, [hexbuf]
-.l:
-  mov rax, rdi
-  and rax, 15
-  shr rdi, 4
-  mov al, [rdx + rax]
-  mov [rbx], al
-  inc rbx
-  loop .l
-
-  mov ecx, 8
-  mov rdi, [hexptr]
-  lea rbx, [hexbuf+8]
-.l2:
-  dec rbx
-  mov al, [rbx]
-  mov [rdi], al
-  add rdi, 2
-  loop .l2
-
-  mov byte [rdi], ' '
-  mov byte [rdi+2], ' '
-  add rdi, 4
-  mov [hexptr], rdi
-
-  pop rdx
-  pop rcx
-  pop rbx
-  pop rax
-  ret
-
-global init_idt
 init_idt:
   mov r9, IDT_errcode_mask
   mov ecx, 0
@@ -237,101 +195,7 @@ vec_common:
   pop r15
   iret
 
-;; API to upper layer
-global set_cr3
-set_cr3:
-  mov rax, rdi
-  mov cr3, rax
-  ret
-
-global new_ctx ; void new_ctx(u64 kstack, u64 ustack, u64 uip, u64 param)
-new_ctx: ; rdi = new stack top, rsi = user stack, rdx = user rip, rcx = user param
-  xchg rdi, rsp
-  push 0x20
-  push rsi
-  pushf
-  push 0x18
-  push rdx
-  push 0
-  push 0
-  push r15
-  push r14
-  push r13
-  push r12
-  push r11
-  push r10
-  push r9
-  push r8
-  push rbp
-  push rcx
-  push rsi
-  push rdx
-  push rcx
-  push rbx
-  push rax
-  xchg rdi, rsp
-  ret
-
-;; Main Kernel Core
-global kmain
-kmain:
-  jmp $
-
-global vec
 vec:
-  mov rdi, [rdi+128]
-  call writehex
   cli
   jmp $
   ret
-
-
-;; Utility Functions
-
-global bzero
-bzero: ; rdi = dest, rsi = size (bytes)
-
-  ; unrolled main loop: 64 bytes per loop
-  
-.preloop: ; pre-loop: align dest to 64-byte boundary
-  mov rax, rdi
-  and rax, 63
-  jz .preloop_exit ; if (dest & 0x3f == 0) break
-  or rsi, rsi
-  jz .preloop_exit ; if (count == 0) break
-  mov byte [rdi], 0
-  inc rdi
-  dec rsi
-  jmp .preloop
-.preloop_exit:
-
-  xor eax, eax
-.loop:
-  cmp rsi, 64
-  jl .loop_exit
-  mov [rdi], rax
-  mov [rdi+8], rax
-  mov [rdi+16], rax
-  mov [rdi+24], rax
-  mov [rdi+32], rax
-  mov [rdi+40], rax
-  mov [rdi+48], rax
-  mov [rdi+56], rax
-  add rdi, 64
-  sub rsi, 64
-  jmp .loop
-.loop_exit:
-  
-.postloop: ; post-loop: remaining count
-  or rsi, rsi
-  jz .postloop_exit
-  mov byte [rdi], 0
-  inc rdi
-  dec rsi
-  jmp .postloop
-.postloop_exit:
-
-  xor eax, eax
-  ret
-
-
