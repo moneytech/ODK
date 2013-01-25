@@ -1,0 +1,3 @@
+*.o
+*.elf
+kern/amd64/bootimg/hd.img
